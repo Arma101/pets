@@ -77,3 +77,8 @@ Triangle count, size, the file paths, what you matched, and any known compromise
   base or coil, with every foot planted. Multi-headed or many-legged creatures must still be mirror-symmetric
   (e.g. 3 heads = one centre head plus a mirrored pair).
 - Keep it at about 5,000 triangles max even for the big legendary ones. Spend the triangles on silhouette, not tiny noise.
+
+## Roblox target (these GLBs go straight into Roblox Studio's 3D Importer)
+- One mesh, one material and one 1024 texture per pet, as already enforced. Stay well under Roblox's about 20k tris per mesh (we cap at about 5k).
+- **Roblox's importer may ignore emissive maps.** Every `glow: true` swatch MUST also look bright and "glowing" in its normal
+  colour (light, saturated top/bot colours such as lava #FFB347→#FF6A00 or runes #9FF7FF→#3FD8FF), so the pet still reads as glowing without emissive.
