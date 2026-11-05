@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8">
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<style>html,body{margin:0;background:#fff}</style></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { makeAtlas } from '/src/kit.js';
+const pet = new URLSearchParams(location.search).get('pet');
+const mod = await import(`/src/pets/${pet}.js?v=${Date.now()}`);
+
+window.buildGLB = async () => {
+  const geo = mod.buildGeometry();
+  const tex = new THREE.CanvasTexture(makeAtlas(mod.PALETTE));
+  tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.name = `${pet}_atlas`;
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0, name: `${pet}_mat` });
+  if (Object.values(mod.PALETTE).some(s => s.glow)) {   // emissive map for glowing swatches
+    const em = new THREE.CanvasTexture(makeAtlas(mod.PALETTE, true));
+    em.flipY = false; em.colorSpace = THREE.SRGBColorSpace; em.name = `${pet}_glow`;
+    mat.emissiveMap = em; mat.emissive = new THREE.Color(0xffffff); mat.emissiveIntensity = 1;
+  }
+  const mesh = new THREE.Mesh(geo, mat); mesh.name = pet;
+  const scene = new THREE.Scene(); scene.add(mesh);
+  const buf = await new GLTFExporter().parseAsync(scene, { binary: true, maxTextureSize: 1024 });
+  const bytes = new Uint8Array(buf);
+  let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const bb = geo.boundingBox;
+  return { b64: btoa(s), tris: geo.attributes.position.count / 3, size: [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z] };
+};
+
+window.renderGLB = async (url, views) => {
+  const gltf = await new GLTFLoader().loadAsync(url);
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+  const R = Math.max(size.x, size.y, size.z);
+  const W = 1024, H = 1024;
+  const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  r.setSize(W, H); r.setClearColor(0xffffff, 1); r.outputColorSpace = THREE.SRGBColorSpace;
+  document.body.appendChild(r.domElement);
+  const scene = new THREE.Scene(); scene.add(gltf.scene);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xcbb8a6, 1.5));
+  const key = new THREE.DirectionalLight(0xfff6ea, 2.6); key.position.set(1.5, 3, 3); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.6); fill.position.set(-2, 1, 1); scene.add(fill);
+  const out = [];
+  for (const v of views) {
+    const cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 100);
+    const d = R * 2.3;
+    cam.position.set(ctr.x + Math.sin(v.az) * Math.cos(v.el) * d, ctr.y + Math.sin(v.el) * d, ctr.z + Math.cos(v.az) * Math.cos(v.el) * d);
+    cam.lookAt(ctr);
+    r.render(scene, cam);
+    out.push(r.domElement.toDataURL('image/png'));
+  }
+  return out;
+};
+window.ready = true;
+</script></body></html>
