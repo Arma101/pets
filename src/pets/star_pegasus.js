@@ -9,8 +9,8 @@ export const PALETTE = {
   eye:    { i: 4, top: '#1A1416', bot: '#0C0A0B' },
   white:  { i: 5, top: '#FFFFFF', bot: '#F1F1F4' },
   brow:   { i: 6, top: '#F2ECF8', bot: '#CFC3E2' },
-  feather:{ i: 7, top: '#FFFEFA', bot: '#F2E8D8' },
-  blue:   { i: 8, top: '#C2D4FF', bot: '#9DB6F5' },
+  feather:{ i: 7, top: '#FFF9EE', bot: '#E9D9C0' },
+  blue:   { i: 8, top: '#9DB4F0', bot: '#7F96E0' },
   gem:    { i: 9, top: '#FFFFFF', bot: '#BFD0FF' },
   pink:   { i: 10, top: '#F8C2D2', bot: '#E28AA6' },
   nostril:{ i: 11, top: '#8A7896', bot: '#5E4E6E' },
@@ -29,6 +29,23 @@ function blade(b, d, n, w, len, th = 0.012) {
     if (wf === 0 && sg === 1) continue;
     pts.push(b.clone().addScaledVector(d, t * len).addScaledVector(s, sg * wf * w).addScaledVector(nn, k * th * (wf === 0 ? 0.3 : 1)));
   }
+  return hull(pts);
+}
+
+// chunky feather: diamond cross-section (central ridge), pointed tip
+function blade2(b, d, n, w, len, th) {
+  d = d.clone().normalize();
+  const sd = new THREE.Vector3().crossVectors(d, n).normalize();
+  const nn = new THREE.Vector3().crossVectors(sd, d).normalize();
+  const pts = [];
+  for (const [t, wf] of [[0, 0.5], [0.3, 1], [0.72, 0.68]]) {
+    const c = b.clone().addScaledVector(d, t * len);
+    for (const k of [-1, 1]) {
+      pts.push(c.clone().addScaledVector(nn, k * th * 1.3));
+      for (const sg of [-1, 1]) pts.push(c.clone().addScaledVector(sd, sg * wf * w).addScaledVector(nn, k * th * 0.35));
+    }
+  }
+  for (const k of [-1, 1]) pts.push(b.clone().addScaledVector(d, len).addScaledVector(nn, k * th * 0.3));
   return hull(pts);
 }
 
@@ -76,6 +93,7 @@ export function buildGeometry() {
   S.push(paint(blob(1, V(0.105, 0.41, -0.22), V(0.088, 0.13, 0.125), { jitter: 0.05 }), SW.body, 'y', [0.2, 0.7]));
 
   // ================= HEAD (big, boxy) =================
+  const hC = C.length, hS = S.length;
   const H = { y: 0.9, z: 0.31 };
   C.push(body([
     ...cbox(V(0, H.y, H.z), 0.152, 0.128, 0.13, 0.048),
@@ -142,6 +160,11 @@ export function buildGeometry() {
     [V(0.0, H.y + 0.15, H.z - 0.05), V(0.15, 0.35, -1), 0.06, 0.24],
     [V(0.08, H.y + 0.1, H.z - 0.08), V(0.5, -0.15, -1), 0.06, 0.26],
     [V(0.03, H.y + 0.04, H.z - 0.12), V(0.25, 0.05, -1), 0.065, 0.28],
+  ]) lock(b, d, w, l);
+  // scale the whole head group up ~10% about the neck top
+  const HP = V(0, H.y - 0.12, H.z - 0.06);
+  for (const g of [...C.slice(hC), ...S.slice(hS)]) { g.translate(-HP.x, -HP.y, -HP.z); g.scale(1.1, 1.1, 1.1); g.translate(HP.x, HP.y, HP.z); }
+  for (const [b, d, w, l] of [
     [V(0.1, 0.86, 0.2), V(0.5, -0.5, -0.9), 0.06, 0.25],
     [V(0.03, 0.8, 0.17), V(0.25, -0.15, -1), 0.065, 0.28],
     [V(0.11, 0.75, 0.16), V(0.5, -0.8, -0.7), 0.055, 0.22],
@@ -169,37 +192,35 @@ export function buildGeometry() {
   C.push(paint(hull([V(0, 0.59, 0.36), V(0.038, 0.53, 0.36), V(0, 0.465, 0.36), V(-0.038, 0.53, 0.36), V(0, 0.53, 0.39)]),
     SW.gem, 'y'));
 
-  // ================= WINGS =================
-  const L0 = V(0.08, 0.6, 0.05), L1 = V(0.2, 0.84, -0.02), L2 = V(0.4, 1.17, -0.38);
-  const wN = new THREE.Vector3().crossVectors(L2.clone().sub(L0), V(0.12, -0.3, -1)).normalize();
-  if (wN.x < 0) wN.negate();
-  const bN = wN.clone().add(V(0, 0.35, 0.3)).normalize(); // shingled feather tilt, catches the light
-  // gold arm along leading edge
-  S.push(gold(tube(curveSamples([L0, L1, L2], 7, (t) => 0.062 - 0.026 * t, (t) => 0.03 - 0.01 * t),
-    { seg: 6, ref: wN, capEnd: 0.04 })));
-  S.push(gold(shard(L1.clone().add(V(0, 0.025, 0)), V(0.1, 1, 0.3), 0.03, 0.085)));
-  const edge = (t) => t < 0.35 ? L0.clone().lerp(L1, t / 0.35) : L1.clone().lerp(L2, (t - 0.35) / 0.65);
-  const fdir = (t) => V(0.12 + 0.1 * t, -0.62 + 0.5 * t, -1);
-  // long cream primaries
+  // ================= WINGS (splayed out into a V, top surface facing forward/up) =================
+  const wn = V(0.5, 0.35, 0.79).normalize();                  // top-surface normal
+  const eL = V(0.46, 0.66, -0.6).normalize();                   // leading-edge direction (~40 deg out from vertical)
+  const eT = new THREE.Vector3().crossVectors(eL, wn).normalize(); // trailing direction in the wing plane (out/down)
+  const L0 = V(0.09, 0.6, 0.04), WL = 0.72;
+  const edge = (t) => L0.clone().addScaledVector(eL, WL * t).addScaledVector(eT, -0.07 * Math.sin(Math.PI * Math.min(1, t * 1.2)));
+  const fdir = (t) => { const a = THREE.MathUtils.degToRad(-5 + 72 * t); return eT.clone().multiplyScalar(Math.cos(a)).addScaledVector(eL, Math.sin(a)); };
+  // bold gold leading edge (arm) + wrist spike
+  const armPts = [0, 0.3, 0.55, 0.8, 1].map(edge);
+  S.push(gold(tube(curveSamples(armPts, 8, (t) => 0.07 - 0.032 * t, (t) => 0.036 - 0.01 * t),
+    { seg: 6, ref: wn, capEnd: 0.045 })));
+  S.push(gold(shard(edge(0.3).addScaledVector(eT, -0.03), eT.clone().negate().addScaledVector(eL, 0.3), 0.032, 0.09)));
+  // long cream primaries, shingled so inner feathers lie on top
   const NP = 12;
   for (let i = 0; i < NP; i++) {
-    const t = 0.08 + 0.92 * i / (NP - 1);
-    S.push(paint(blade(edge(t).addScaledVector(wN, -0.014), fdir(t), bN, 0.072, 0.24 + 0.34 * t, 0.012), SW.feather, 'flat'));
+    const t = 0.06 + 0.94 * i / (NP - 1);
+    const b = edge(t).addScaledVector(eT, 0.035).addScaledVector(wn, -0.012 - 0.004 * i);
+    S.push(paint(blade2(b, fdir(t), wn, 0.07, 0.23 + 0.28 * t, 0.013), SW.feather, 'y'));
   }
-  // cream secondaries between primaries and coverts
-  const NS = 9;
-  for (let i = 0; i < NS; i++) {
-    const t = 0.06 + 0.84 * i / (NS - 1);
-    S.push(paint(blade(edge(t).addScaledVector(wN, 0.0).addScaledVector(fdir(t).normalize(), 0.03), fdir(t), bN, 0.065,
-      0.2 + 0.16 * t, 0.011), SW.feather, 'flat'));
-  }
-  // light-blue coverts on top
-  const NC = 9;
+  // periwinkle coverts on top, just under the gold edge
+  const NC = 10;
   for (let i = 0; i < NC; i++) {
-    const t = 0.06 + 0.86 * i / (NC - 1);
-    S.push(paint(blade(edge(t).addScaledVector(wN, 0.016).addScaledVector(fdir(t).normalize(), 0.01), fdir(t), bN, 0.064,
-      0.15 + 0.13 * t, 0.011), SW.blue, 'flat'));
+    const t = 0.04 + 0.86 * i / (NC - 1);
+    const b = edge(t).addScaledVector(eT, 0.03).addScaledVector(wn, 0.022 - 0.003 * i);
+    S.push(paint(blade2(b, fdir(t * 0.85), wn, 0.062, 0.14 + 0.1 * t, 0.012), SW.blue, 'flat'));
   }
 
   return assemble(C, S);
 }
+
+// Game name: MeshPart name in Roblox and the export file name
+export const NAME = 'StarPegasus';

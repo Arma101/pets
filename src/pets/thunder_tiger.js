@@ -18,22 +18,22 @@ const SPINE = 0.585;                                           // top of back
 // ---- stripe patterns (all symmetric in x) ----
 // flank stripes: [z at spine, y where it ends, half-width at top, slant (dz per unit drop)]
 const FLANK = [
-  [-0.385, 0.33, 0.026, 0.05],
-  [-0.29, 0.22, 0.034, 0.12],
-  [-0.185, 0.27, 0.032, 0.2],
-  [-0.075, 0.21, 0.034, 0.22],
-  [0.035, 0.27, 0.032, 0.26],
-  [0.135, 0.34, 0.026, 0.3],
+  [-0.385, 0.33, 0.022, 0.05],
+  [-0.29, 0.22, 0.027, 0.12],
+  [-0.185, 0.27, 0.026, 0.2],
+  [-0.075, 0.21, 0.027, 0.22],
+  [0.035, 0.27, 0.026, 0.26],
+  [0.135, 0.34, 0.022, 0.3],
 ];
 // short stripes rising from the belly: [z at belly, y top, half-width]
 const BELLY = [[-0.235, 0.35, 0.022], [-0.125, 0.32, 0.02], [-0.02, 0.36, 0.022]];
-function bodyStripe(z, y, top = false) {
+function bodyStripe(z, y, top = false, x = 0) {
   for (const [zi, yEnd, w, sl] of FLANK) {
-    if (top) { if (Math.abs(z - zi) < w) return true; continue; }
+    if (top) { if (Math.abs(z - zi - 0.006 * Math.sin(x * 40)) < w * (0.85 + 0.15 * Math.cos(x * 25))) return true; continue; }
     if (y < yEnd) continue;
     const d = clamp01((SPINE - y) / (SPINE - yEnd));
     const zc = zi + sl * (SPINE - y) + 0.012 * Math.sin(d * 5);
-    if (Math.abs(z - zc) < w * Math.pow(1 - d, 0.75) + 0.003) return true;
+    if (Math.abs(z - zc) < w * Math.pow(1 - d, 0.6) + 0.003) return true;
   }
   if (!top) for (const [zi, yTop, w] of BELLY) {
     if (y > yTop) continue;
@@ -60,9 +60,9 @@ function headFront(lx, ly) {
   return false;
 }
 function headSide(lz, ly) {
-  for (const [y0, z1] of [[0.1, -0.02], [0.035, 0.03], [-0.03, 0.06], [-0.09, 0.0]]) {
+  for (const [y0, z1] of [[0.11, -0.1], [0.05, -0.04], [-0.015, -0.01], [-0.08, -0.07]]) {
     const d = clamp01((lz + 0.22) / (z1 + 0.22));
-    if (lz < z1 && Math.abs(ly - y0 - 0.08 * (lz + 0.22)) < 0.02 * (1 - d) + 0.002) return true;
+    if (lz < z1 && Math.abs(ly - y0 - 0.12 * (lz + 0.22)) < 0.024 * Math.pow(1 - d, 0.8) + 0.002) return true;
   }
   return false;
 }
@@ -92,9 +92,10 @@ const BACK_BANDS = [[0.42, 0.024], [0.34, 0.022], [0.255, 0.02], [0.175, 0.016]]
 // ---------------- atlas regions (absolute pixel rects, a = horizontal coord, b = vertical coord) ----------------
 const REG = {
   bodySide: { x: 0, y: 256, w: 512, h: 256, a: [-0.5, 0.36], b: [0.66, 0.14],
-    col: (z, y) => (bodyStripe(z, y) ? black((0.62 - y) / 0.44) : orange((0.62 - y) / 0.44)) },
+    col: (z, y) => (y < 0.245 ? lerp3([250, 232, 200], [226, 196, 150], (0.245 - y) / 0.05)
+      : bodyStripe(z, y) ? black((0.62 - y) / 0.44) : orange((0.62 - y) / 0.44)) },
   bodyTop: { x: 512, y: 256, w: 512, h: 256, a: [-0.5, 0.36], b: [-0.26, 0.26],
-    col: (z) => (bodyStripe(z, SPINE, true) ? black(0) : orange(0.02)) },
+    col: (z, x) => (bodyStripe(z, SPINE, true, x) ? black(0) : orange(0.02)) },
   headFront: { x: 0, y: 512, w: 256, h: 256, a: [-0.28, 0.28], b: [0.26, -0.24],
     col: (x, ly) => (headFront(x, ly) ? black((0.2 - ly) / 0.42) : orange((0.2 - ly) / 0.42 * 0.8)) },
   headSide: { x: 256, y: 512, w: 256, h: 256, a: [-0.24, 0.24], b: [0.26, -0.24],
@@ -201,15 +202,18 @@ export function buildGeometry() {
   // front legs (thick, straight) + shoulder mass
   const FL = { x: 0.155, z: 0.2 };
   S.push(legPaint(hull([...ring(V(FL.x, 0.06, FL.z + 0.01), 0.082, 0.08, 8), ...ring(V(FL.x - 0.004, 0.2, FL.z), 0.088, 0.088, 8),
-    ...ring(V(FL.x - 0.02, 0.38, FL.z - 0.02), 0.1, 0.115, 8), ...ring(V(FL.x - 0.03, 0.47, FL.z - 0.03), 0.07, 0.09, 8)]), REG.legF, FL.x, FL.z));
+    ...ring(V(FL.x - 0.015, 0.37, FL.z - 0.02), 0.108, 0.125, 8), ...ring(V(FL.x - 0.03, 0.48, FL.z - 0.03), 0.08, 0.1, 8)]), REG.legF, FL.x, FL.z));
   // back legs: big haunch + shin
   const BL = { x: 0.16, z: -0.3 };
-  S.push(legPaint(hull([...ring(V(BL.x - 0.015, 0.44, BL.z + 0.02), 0.14, 0.14, 8, 'x'),
-    ...ring(V(BL.x + 0.005, 0.44, BL.z + 0.02), 0.12, 0.12, 8, 'x'),
+  S.push(legPaint(hull([...ring(V(BL.x - 0.03, 0.43, BL.z + 0.02), 0.145, 0.14, 10, 'x'),
+    ...ring(V(BL.x + 0.03, 0.42, BL.z + 0.015), 0.095, 0.095, 8, 'x'),
     ...ring(V(BL.x + 0.005, 0.2, BL.z - 0.03), 0.085, 0.09, 8)]),
   REG.legB, BL.x, BL.z));
   S.push(legPaint(hull([...ring(V(BL.x + 0.005, 0.22, BL.z - 0.03), 0.082, 0.088, 8), ...ring(V(BL.x + 0.008, 0.06, BL.z + 0.0), 0.078, 0.076, 8)]),
     REG.legB, BL.x, BL.z));
+  // angular fur tufts: elbow (behind front leg) and top of the haunch
+  S.push(org(shard(V(FL.x + 0.02, 0.3, FL.z - 0.08), V(0.3, -0.5, -1), 0.04, 0.08), 0.1, 0.5));
+  S.push(org(shard(V(BL.x + 0.03, 0.52, BL.z + 0.06), V(0.4, 0.5, -1), 0.04, 0.07), 0.2, 0.7));
   // paws: cream block + 4 toes
   const paw = (x, z, s = 1) => {
     S.push(paint(hull(cbox(V(x, 0.045, z), 0.078 * s, 0.045, 0.072 * s, 0.024)), SW.paw, 'y', [0, 0.1]));
@@ -278,6 +282,8 @@ export function buildGeometry() {
     V(E.x - 0.004, E.y, 0), FZ + 0.006, FZ + 0.018)), SW.eye, 'flat'));
   S.push(paint(hull(plate([[-0.007, -0.007], [0.007, -0.007], [0.007, 0.007], [-0.007, 0.007]],
     V(E.x + 0.006, E.y + 0.002, 0), FZ + 0.014, FZ + 0.021)), SW.white, 'flat'));
+  // black upper lid line along the angry slanted top of the eye
+  S.push(paint(hull(plate([[-0.05, 0.0], [0.054, 0.033], [0.056, 0.044], [-0.05, 0.012]], E, FZ - 0.008, FZ + 0.024)), SW.black, 'flat'));
   // heavy brow
   S.push(paint(hull([
     V(0.03, E.y + 0.012, FZ + 0.03), V(0.032, E.y + 0.05, FZ + 0.02),
@@ -295,8 +301,8 @@ export function buildGeometry() {
 
   // ================= TAIL (long, striped, curling up) =================
   C.push(paint(tube(curveSamples(
-    [V(0, 0.46, -0.43), V(0, 0.5, -0.56), V(0, 0.64, -0.66), V(0, 0.82, -0.66), V(0, 0.93, -0.57), V(0, 0.92, -0.47), V(0, 0.85, -0.44)],
-    18, (t) => 0.06 + 0.014 * t), { seg: 8, axis: X, capStart: 0, capEnd: 0.035 }), SW.tail, 'len'));
+    [V(0, 0.46, -0.42), V(0, 0.5, -0.57), V(0, 0.62, -0.7), V(0, 0.78, -0.75), V(0, 0.91, -0.69), V(0, 0.94, -0.59), V(0, 0.88, -0.52)],
+    22, (t) => 0.06 + 0.014 * t), { seg: 8, axis: X, capStart: 0, capEnd: 0.035 }), SW.tail, 'len'));
 
   // crouch: compress the legs a little so the body sits lower (UVs are already set, so stripes stay put)
   for (const g of [...C, ...S]) {
@@ -309,3 +315,6 @@ export function buildGeometry() {
   }
   return assemble(C, S);
 }
+
+// Game name: MeshPart name in Roblox and the export file name
+export const NAME = 'ThunderTiger';

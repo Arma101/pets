@@ -6,8 +6,9 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { makeAtlas } from '/src/kit.js';
-const pet = new URLSearchParams(location.search).get('pet');
-const mod = await import(`/src/pets/${pet}.js?v=${Date.now()}`);
+const petMod = new URLSearchParams(location.search).get('pet');
+const mod = await import(`/src/pets/${petMod}.js?v=${Date.now()}`);
+const pet = mod.NAME || petMod;   // mesh/material names use the game name
 
 window.buildGLB = async () => {
   const geo = mod.buildGeometry();

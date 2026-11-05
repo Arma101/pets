@@ -68,9 +68,13 @@ export function buildGeometry() {
     [0.38, 0.32, 0.115, 0.034, 0.2],
     [0.31, 0.29, 0.11, 0.034, 0.45],
     [0.25, 0.235, 0.105, 0.034, 0.85],
+    [0.205, 0.165, 0.1, 0.036, 1.25],
+    [0.175, 0.08, 0.1, 0.038, 1.5],
+    [0.165, -0.01, 0.1, 0.038, 1.57],
+    [0.165, -0.1, 0.095, 0.038, 1.62],
   ];
   for (const [y, z, w, l, t] of belly) {
-    const up = V(0, Math.cos(t), -Math.sin(t)), n = V(0, Math.sin(t), Math.cos(t));
+    const up = V(0, Math.cos(t), Math.sin(t)), n = V(0, -Math.sin(t), Math.cos(t));
     const pts = [];
     for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
       const c = V(0, y, z).addScaledVector(up, sy * l);
@@ -84,7 +88,7 @@ export function buildGeometry() {
   {
     const pts = [];
     for (const [y, z, w, l, t] of belly.slice(0, 6)) {
-      const up = V(0, Math.cos(t), -Math.sin(t)), n = V(0, Math.sin(t), Math.cos(t));
+      const up = V(0, Math.cos(t), Math.sin(t)), n = V(0, -Math.sin(t), Math.cos(t));
       for (const sy of [-1, 1]) {
         const c = V(0, y, z).addScaledVector(up, sy * l);
         for (const sx of [-1, 1]) pts.push(c.clone().addScaledVector(X, sx * (w + 0.035)).addScaledVector(n, -0.04));
@@ -164,8 +168,8 @@ export function buildGeometry() {
   for (const [y, z, s] of [[0.6, 0.13, 1.1], [0.58, 0.02, 1.35], [0.57, -0.1, 1.3], [0.55, -0.22, 1.1], [0.49, -0.32, 0.85]])
     C.push(gold(shard(V(0, y, z), V(0, 1, -0.55), 0.055 * s, 0.11 * s)));
   // shoulder spikes
-  S.push(gold(shard(V(0.11, 0.56, 0.1), V(0.5, 1, 0.1), 0.055, 0.13)));
-  S.push(gold(shard(V(0.15, 0.52, -0.06), V(0.7, 1, -0.3), 0.05, 0.12)));
+  S.push(gold(shard(V(0.11, 0.57, 0.11), V(0.45, 1, 0.15), 0.065, 0.16)));
+  S.push(gold(shard(V(0.16, 0.52, -0.05), V(0.7, 1, -0.3), 0.06, 0.15)));
   S.push(gold(shard(V(0.14, 0.47, -0.2), V(0.6, 1, -0.6), 0.045, 0.1)));
 
   // ================= TAIL =================
@@ -179,24 +183,23 @@ export function buildGeometry() {
     const k = 1.15 - t * 0.6;
     C.push(gold(shard(p.clone().addScaledVector(n, r * 0.75), n.clone().addScaledVector(T, -0.6), 0.045 * k, 0.09 * k)));
   }
-  for (const t of [0.08, 0.2, 0.32, 0.44, 0.56]) {
-    const p = tc.getPoint(t), T = tc.getTangent(t);
-    const n = V(0, T.z, -T.y).normalize(); if (n.y + n.z * 0.3 < 0) n.negate();
-    const r = 0.11 * (1 - t) + 0.026, w = r * 0.62, l = 0.045 * (1 - t * 0.5);
-    const pts = [];
-    for (const sx of [-1, 1]) for (const sl of [-1, 1]) {
-      const c = p.clone().addScaledVector(T, sl * l);
-      pts.push(c.clone().addScaledVector(X, sx * w).addScaledVector(n, -r * 0.55));
-      pts.push(c.clone().addScaledVector(X, sx * w * 0.7).addScaledVector(n, -r * 0.92));
-      pts.push(c.clone().addScaledVector(X, sx * w * 0.5).addScaledVector(n, -r * 1.06).addScaledVector(T, -sl * 0.006));
+  // cream underside keel (segmented by its own facets)
+  {
+    const sm = [];
+    for (let k = 0; k <= 9; k++) {
+      const t = 0.03 + k * 0.075, p = tc.getPoint(t), T = tc.getTangent(t);
+      const n = V(0, T.z, -T.y).normalize(); if (n.y + n.z * 0.3 < 0) n.negate();
+      const r = 0.11 * (1 - t) + 0.026;
+      sm.push({ p: p.clone().addScaledVector(n, -r * 0.5), rx: r * 0.68, ry: r * 0.68 });
     }
-    C.push(paint(hull(pts), P.cream, 'flat'));
+    C.push(paint(tube(sm, { seg: 6, axis: X, phase: Math.PI / 6 }), P.cream, 'flat'));
   }
   // spade tip: centre blade + side barbs
   const tip = tc.getPoint(1), tT = tc.getTangent(1);
   C.push(gold(hull([tip.clone().addScaledVector(tT, 0.22), tip.clone().addScaledVector(tT, -0.02),
     V(0.1, tip.y + 0.05, tip.z), V(-0.1, tip.y + 0.05, tip.z),
-    V(0, tip.y + 0.05, tip.z - 0.03), V(0, tip.y + 0.05, tip.z + 0.03)])));
+    V(0, tip.y + 0.05, tip.z - 0.075), V(0, tip.y + 0.05, tip.z + 0.075)])));
+  C.push(gold(shard(V(0, tip.y + 0.03, tip.z + 0.02), V(0, -0.4, 1), 0.03, 0.1)));
   S.push(gold(shard(V(0.06, tip.y + 0.04, tip.z), V(1, -0.7, 0), 0.035, 0.11)));
   C.push(gold(shard(V(0, tip.y + 0.03, tip.z - 0.02), V(0, -0.4, -1), 0.03, 0.1)));
 
@@ -238,3 +241,6 @@ export function buildGeometry() {
   for (const g of S.slice(nS)) g.translate(0, -DROP, 0);
   return assemble(C, S);
 }
+
+// Game name: MeshPart name in Roblox and the export file name
+export const NAME = 'RookieDragon';

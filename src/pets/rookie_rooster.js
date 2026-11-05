@@ -198,3 +198,6 @@ export function buildGeometry() {
 
   return assemble(C, S);
 }
+
+// Game name: MeshPart name in Roblox and the export file name
+export const NAME = 'RookieRooster';

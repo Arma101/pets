@@ -96,14 +96,22 @@ export function buildGeometry() {
   // ================= HEAD (big blocky skull + long snout, open toothy mouth) =================
   const HC = [], HS = [];
   const SK = { y: 0.89, z: 0.27 };
-  HC.push(green([...cbox(V(0, SK.y, SK.z), 0.15, 0.115, 0.13, 0.04)], 0.6, 1.02));
-  const FZ = SK.z + 0.13; // skull front face
+  const FZ = SK.z + 0.13; // skull front face (centre panel)
+  // skull: boxy back, front corners cut into ~23 degree panels so the eyes can face slightly outward
+  const EYAW = Math.atan2(0.048, 0.115);
+  HC.push(green([
+    ...cbox(V(0, SK.y, SK.z), 0.15, 0.115, 0.13, 0.04).filter((p) => p.z < FZ - 0.05),
+    ...[-1, 1].flatMap((sx) => [-1, 1].flatMap((sy) => [
+      V(sx * 0.035, SK.y + sy * 0.085, FZ), V(sx * 0.035, SK.y + sy * 0.115, FZ - 0.03),
+      V(sx * 0.15, SK.y + sy * 0.085, FZ - 0.048), V(sx * 0.135, SK.y + sy * 0.115, FZ - 0.072),
+    ])),
+  ], 0.6, 1.02));
   // upper jaw / snout
-  HC.push(green([...cbox(V(0, 0.84, 0.47), 0.115, 0.055, 0.125, 0.03), V(0.1, 0.895, 0.38), V(-0.1, 0.895, 0.38)], 0.6, 1.0));
-  HC.push(green(cbox(V(0, 0.893, 0.555), 0.07, 0.018, 0.035, 0.012), 0.6, 1.0)); // nostril bump
+  HC.push(green([...cbox(V(0, 0.83, 0.47), 0.115, 0.055, 0.125, 0.03), V(0.09, 0.875, 0.36), V(-0.09, 0.875, 0.36)], 0.6, 1.0));
+  HC.push(green(cbox(V(0, 0.883, 0.555), 0.07, 0.018, 0.035, 0.012), 0.6, 1.0)); // nostril bump
   // mouth interior
   HC.push(flat(hull(cbox(V(0, 0.75, 0.39), 0.1, 0.045, 0.125, 0.01)), SW.mouth));
-  for (const x of [-0.035, 0.035]) HC.push(flat(hull(cbox(V(x, 0.907, 0.585), 0.009, 0.004, 0.008, 0.002)), SW.dark)); // nostrils
+  for (const x of [-0.035, 0.035]) HC.push(flat(hull(cbox(V(x, 0.897, 0.585), 0.009, 0.004, 0.008, 0.002)), SW.dark)); // nostrils
   // cream lower jaw / underjaw (wide at the back like a big chin)
   HC.push(paint(hull([
     ...cbox(V(0, 0.68, 0.42), 0.1, 0.04, 0.14, 0.02),
@@ -117,20 +125,25 @@ export function buildGeometry() {
   for (const x of [0.022, 0.065]) HS.push(tooth(x, 0.718, 0.545, 0.04));
   for (const z of [0.49, 0.43, 0.37]) HS.push(tooth(0.088, 0.718, z, 0.04));
 
-  // fierce eyes on the skull front, heavy brow
-  const E = V(0.07, 0.928, 0);
-  HS.push(flat(hull(plate([[-0.04, 0.004], [0.044, 0.034], [0.05, -0.008], [0.022, -0.038], [-0.028, -0.036], [-0.045, -0.016]],
-    E, FZ - 0.01, FZ + 0.01, 0.5)), SW.white));
-  HS.push(flat(hull(plate([[-0.024, 0.002], [0.014, 0.016], [0.02, -0.006], [0.006, -0.027], [-0.018, -0.025], [-0.028, -0.01]],
-    V(E.x - 0.002, E.y, 0), FZ + 0.004, FZ + 0.016, 0.5)), SW.eye));
-  HS.push(flat(hull(plate([[-0.006, -0.006], [0.006, -0.006], [0.006, 0.006], [-0.006, 0.006]],
-    V(E.x + 0.006, E.y + 0.002, 0), FZ + 0.012, FZ + 0.02, 0.5)), SW.white));
-  HS.push(paint(hull([
-    V(0.025, E.y + 0.01, FZ + 0.025), V(0.028, E.y + 0.045, FZ + 0.015),
-    V(0.15, E.y + 0.045, FZ - 0.03), V(0.15, E.y + 0.08, FZ - 0.04),
-    V(0.025, E.y + 0.01, FZ - 0.03), V(0.028, E.y + 0.055, FZ - 0.04),
-    V(0.15, E.y + 0.045, FZ - 0.07), V(0.15, E.y + 0.08, FZ - 0.08),
-  ]), SW.brow, 'y', [0.9, 1.05]));
+  // fierce eyes on the angled front-corner panels (yawed ~23 deg outward), scaled up 1.3x, heavy brow
+  const ESC = 1.3, EX = 0.088, EY = 0.94, EZ = FZ - (EX - 0.035) * Math.tan(EYAW);
+  const eyePart = (g, sw, mode = 'flat', range = null) => {
+    g.scale(ESC, ESC, ESC); g.rotateY(EYAW); g.translate(EX, EY, EZ);
+    return paint(g, sw, mode, range);
+  };
+  const O = V(0, 0, 0);
+  HS.push(eyePart(hull(plate([[-0.04, 0.004], [0.044, 0.034], [0.05, -0.008], [0.022, -0.038], [-0.028, -0.036], [-0.045, -0.016]],
+    O, -0.012, 0.008)), SW.white));
+  HS.push(eyePart(hull(plate([[-0.024, 0.002], [0.014, 0.016], [0.02, -0.006], [0.006, -0.027], [-0.018, -0.025], [-0.028, -0.01]],
+    V(-0.002, 0, 0), 0.004, 0.0125)), SW.eye));
+  HS.push(eyePart(hull(plate([[-0.006, -0.006], [0.006, -0.006], [0.006, 0.006], [-0.006, 0.006]],
+    V(0.006, 0.002, 0), 0.009, 0.0155)), SW.white));
+  HS.push(eyePart(hull([
+    V(-0.05, 0.008, 0.024), V(-0.047, 0.042, 0.014),
+    V(0.062, 0.04, 0.0), V(0.062, 0.07, -0.01),
+    V(-0.05, 0.008, -0.03), V(-0.047, 0.05, -0.04),
+    V(0.062, 0.04, -0.05), V(0.062, 0.07, -0.06),
+  ]), SW.brow, 'y', [0.95, 1.06]));
 
   // crown: splayed side spikes at the back of the skull
   for (const [z, h] of [[0.2, 0.09], [0.29, 0.07]]) {
@@ -181,3 +194,6 @@ export function buildGeometry() {
 
   return assemble(C, S);
 }
+
+// Game name: MeshPart name in Roblox and the export file name
+export const NAME = 'KnockoutRex';

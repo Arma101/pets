@@ -4,14 +4,14 @@ import { V, THREE, hull, cbox, ring, plate, shard, blob, tube, curveSamples, pai
 export const PALETTE = {
   brown:    { i: 0, top: '#C98242', bot: '#7A421F' },
   cream:    { i: 1, top: '#FFF6E4', bot: '#E9D3AE' },
-  white:    { i: 2, top: '#FFFFFF', bot: '#F2EEE8' },
+  white:    { i: 2, top: '#FFFFFF', bot: '#F6EEDF' },
   feather:  { i: 3, top: '#FFFFFF', bot: '#E6D9C4' },
   gold:     { i: 4, top: '#FFE46C', bot: '#E39E12' },
   goldDk:   { i: 5, top: '#F6C431', bot: '#B9780C' },
   beak:     { i: 6, top: '#FFE14E', bot: '#EE9710' },
   eye:      { i: 7, top: '#1A1416', bot: '#0C0A0B' },
   brow:     { i: 8, top: '#FFFFFF', bot: '#CDBBA0' },
-  wing:     { i: 9, top: '#FFFBF0', bot: '#F0D6AA' },
+  wing:     { i: 9, top: '#FFF8E4', bot: '#F6DBA8' },
   paw:      { i: 10, top: '#FCEBC6', bot: '#DDB57C' },
   gem:      { i: 11, top: '#FFF6B0', bot: '#E8A010' },
   mouth:    { i: 12, top: '#6A3A1A', bot: '#3E1E10' },
@@ -106,15 +106,18 @@ export function buildGeometry() {
   S.push(goldF(shard(V(0.16, 0.4, 0.21), V(0.5, -0.6, 0.6), 0.065, 0.11)));
   S.push(goldF(shard(V(0.175, 0.33, 0.18), V(0.6, -0.9, 0.2), 0.055, 0.1)));
   S.push(goldF(shard(V(0.17, 0.45, 0.13), V(0.7, -0.4, -0.4), 0.055, 0.095)));
+  // gold armour plates where the wings join the back
+  S.push(goldF(shard(V(0.12, 0.54, 0.02), V(0.6, 0.3, -1), 0.055, 0.12)));
+  S.push(goldF(shard(V(0.15, 0.5, -0.04), V(0.8, -0.3, -1), 0.045, 0.1)));
   const talon = (x, z) => {
-    S.push(gold(hull(cbox(V(x, 0.042, z), 0.055, 0.042, 0.05, 0.02))));
+    S.push(gold(hull(cbox(V(x, 0.044, z), 0.06, 0.044, 0.055, 0.02))));
     for (const a of [-0.5, 0, 0.5]) {
       const d = V(Math.sin(a), 0, Math.cos(a));
-      const k = add(V(x, 0.03, z), d, 0.085);
-      S.push(gold(hull([...cbox(add(V(x, 0.036, z), d, 0.03), 0.022, 0.032, 0.022, 0.008), ...cbox(k, 0.02, 0.026, 0.02, 0.008)])));
-      S.push(goldDk(shard(add(k, d, 0.014), add(d, V(0, -0.9, 0)), 0.018, 0.055)));
+      const k = add(V(x, 0.036, z), d, 0.095);
+      S.push(gold(hull([...cbox(add(V(x, 0.038, z), d, 0.035), 0.024, 0.036, 0.024, 0.009), ...cbox(k, 0.021, 0.028, 0.021, 0.008)])));
+      S.push(goldDk(shard(add(k, d, 0.015), add(d, V(0, -0.75, 0)), 0.019, 0.062)));
     }
-    S.push(goldDk(shard(V(x, 0.03, z - 0.04), V(0, -0.6, -1), 0.018, 0.055)));
+    S.push(goldDk(shard(V(x, 0.034, z - 0.045), V(0, -0.6, -1), 0.019, 0.06)));
   };
   talon(0.145, 0.26);
 
@@ -142,6 +145,12 @@ export function buildGeometry() {
   mane(5, -1.0, 1.25, 0.15, H.z + 0.02, 1.6, 0.13, 0.085, SW.feather, 0.0);
   mane(5, -1.2, 1.35, 0.15, H.z - 0.07, 1.3, 0.17, 0.095, SW.feather, 0.012);
   mane(4, -1.0, 1.15, 0.12, H.z - 0.14, 1.5, 0.17, 0.1, SW.cream, 0.02);
+  // shingled feathers covering the back of the head and nape
+  for (const [dy, len] of [[0.11, 0.15], [0.02, 0.16], [-0.07, 0.17]]) {
+    const dir = V(0, -1, -0.45), n = nrm(V(0, 0.45, -1));
+    C.push(paint(blade(V(0, H.y + dy, H.z - 0.155 - dy * 0.15), dir, n, len, 0.12, 0.03, kite), dy > 0.05 ? SW.feather : SW.cream, 'flat'));
+    S.push(paint(blade(V(0.075, H.y + dy - 0.02, H.z - 0.15 - dy * 0.15), V(0.35, -1, -0.45), nrm(V(0.3, 0.45, -1)), len, 0.11, 0.03, kite), SW.feather, 'flat'));
+  }
   C.push(feath(shard(V(0, H.y + 0.14, H.z - 0.09), V(0, 0.6, -1), 0.055, 0.14)));
   S.push(feath(shard(V(0.16, H.y - 0.06, H.z + 0.04), V(1, -0.5, -0.2), 0.05, 0.09)));
   S.push(feath(shard(V(0.14, H.y - 0.115, H.z + 0.06), V(0.6, -1, -0.1), 0.05, 0.09)));
@@ -171,11 +180,11 @@ export function buildGeometry() {
   const E = V(0.09, H.y + 0.04, 0), es = 1.25;
   const sc = (arr) => arr.map(([u, v]) => [u * es, v * es]);
   S.push(paint(hull(plate(sc([[-0.036, 0.0], [0.044, 0.03], [0.05, -0.008], [0.02, -0.036], [-0.026, -0.032], [-0.04, -0.016]]),
-    E, FZ - 0.014, FZ + 0.008, 0.35)), SW.white, 'flat'));
+    E, FZ - 0.016, FZ + 0.008, 0.8)), SW.white, 'flat'));
   S.push(paint(hull(plate(sc([[-0.026, 0.0], [0.014, 0.017], [0.022, -0.008], [0.006, -0.03], [-0.02, -0.028], [-0.03, -0.012]]),
-    V(E.x - 0.004, E.y, 0), FZ + 0.0, FZ + 0.014, 0.35)), SW.eye, 'flat'));
+    V(E.x - 0.004, E.y, 0), FZ - 0.002, FZ + 0.016, 0.8)), SW.eye, 'flat'));
   S.push(paint(hull(plate([[-0.008, -0.008], [0.008, -0.008], [0.008, 0.008], [-0.008, 0.008]],
-    V(E.x + 0.006, E.y + 0.002, 0), FZ + 0.008, FZ + 0.019, 0.35)), SW.white, 'flat'));
+    V(E.x + 0.006, E.y + 0.002, 0), FZ + 0.01, FZ + 0.022, 0.8)), SW.white, 'flat'));
   // heavy brow slanting down toward the beak
   S.push(paint(hull([
     V(0.025, E.y + 0.01, FZ + 0.03), V(0.028, E.y + 0.05, FZ + 0.018),
@@ -239,3 +248,6 @@ export function buildGeometry() {
 
   return assemble(C, S);
 }
+
+// Game name: MeshPart name in Roblox and the export file name
+export const NAME = 'GloveGodGriffin';

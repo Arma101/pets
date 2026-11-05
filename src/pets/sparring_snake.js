@@ -84,6 +84,30 @@ function coil(cy, R, prof, N) {
   return finish(pos, meta);
 }
 
+// raised gold pyramid scales on the up-pointing triangles of strip k = M-1 (outer equator band)
+function goldTeeth(cy, R, prof, N, lift) {
+  const M = prof.length, out = [];
+  const P_ = (i, k) => {
+    const kk = ((k % M) + M) % M;
+    const phi = (2 * Math.PI * (i + 0.5 * (kk % 2))) / N, rad = R + prof[kk][0];
+    return V(Math.sin(phi) * rad, cy + prof[kk][1], Math.cos(phi) * rad);
+  };
+  for (let i = 0; i < N; i++) {
+    const t = [P_(i, M - 1), P_(i + 1, M - 1), P_(i + 1, 0)];
+    const cen = t[0].clone().add(t[1]).add(t[2]).divideScalar(3);
+    const n = new THREE.Vector3().subVectors(t[1], t[0]).cross(new THREE.Vector3().subVectors(t[2], t[0])).normalize();
+    if (n.dot(V(cen.x, 0, cen.z)) < 0) n.negate();
+    const pts = [];
+    for (const v of t) {
+      const q = v.clone().lerp(cen, 0.08);
+      pts.push(q.clone().addScaledVector(n, 0.005), q.clone().addScaledVector(n, -0.02));
+    }
+    pts.push(cen.clone().addScaledVector(n, lift));
+    out.push(paint(hull(pts), PALETTE.gold, 'y', [cy - 0.06, cy + 0.06]));
+  }
+  return out;
+}
+
 // Tube with antiprism rings (odd rings shifted half a step) along samples; frame A = -x for curves in the YZ plane.
 function scaleTube(samples, seg, phase, { capStart = 0, capEnd = 0 } = {}) {
   const n = samples.length, rings = [], frames = [];
@@ -136,12 +160,13 @@ export function buildGeometry() {
 
   // ================= COIL BASE (two stacked closed rings) =================
   // profile: k0 outer-upper ... k7 outer-lower; strip k7->k0 = gold teeth, k6->k7 = cream band
-  const prof0 = [[0.14, 0.035], [0.105, 0.1], [0.02, 0.13], [-0.09, 0.1], [-0.13, 0.01], [-0.1, -0.1], [0.1, -0.13], [0.145, -0.045]];
+  const prof0 = [[0.14, 0.035], [0.105, 0.1], [0.02, 0.13], [-0.09, 0.1], [-0.13, 0.01], [-0.1, -0.1], [0.125, -0.12], [0.148, -0.045]];
   C.push(paintTris(coil(0.13, 0.28, prof0, 20), (c, n, m) => {
     if (m.k === 7) return m.apex === 'up' ? P.gold : P.green;
     if (m.k >= 4 && m.k <= 6) return P.cream;
     return m.apex === 'up' ? P.green : P.greenS;
   }, 0.0, 0.27));
+  C.push(...goldTeeth(0.13, 0.28, prof0, 20, 0.03));
   const prof1 = [[0.105, 0.025], [0.08, 0.075], [0.01, 0.095], [-0.07, 0.07], [-0.09, 0.0], [-0.06, -0.06], [0.07, -0.08], [0.105, -0.035]];
   C.push(paintTris(coil(0.29, 0.165, prof1, 16), (c, n, m) => {
     if (m.k === 7 && m.apex === 'up') return P.gold;
@@ -149,9 +174,11 @@ export function buildGeometry() {
     return m.apex === 'up' ? P.green : P.greenS;
   }, 0.18, 0.39));
 
+  C.push(...goldTeeth(0.29, 0.165, prof1, 16, 0.022));
+
   // ================= NECK (S-curve in the YZ plane) with raised belly plates =================
   const neckPts = [V(0, 0.22, -0.06), V(0, 0.38, 0.0), V(0, 0.52, 0.065), V(0, 0.65, 0.01), V(0, 0.76, -0.02), V(0, 0.84, 0.02)];
-  const nr = (t) => 0.128 - 0.03 * t;
+  const nr = (t) => 0.13 - 0.02 * t;
   const neckS = curveSamples(neckPts, 12, nr);
   C.push(paintTris(scaleTube(neckS, 10, Math.PI / 2), () => P.green, 0.2, 0.85));
   {
@@ -163,19 +190,31 @@ export function buildGeometry() {
     for (let i = 3; i < 24; i += 2) {
       const pts = [];
       for (const [j, sh] of [[i, 0.004], [i + 2, -0.004]]) {
-        const s0 = fine[Math.min(j, 25)], F = fr(Math.min(j, 25)), r = s0.rx, w = r * 0.62;
+        const s0 = fine[Math.min(j, 25)], F = fr(Math.min(j, 25)), r = s0.rx, w = r * 0.66;
         const p = s0.p.clone();
         for (const sx of [-1, 1]) {
           pts.push(p.clone().addScaledVector(X, sx * w).addScaledVector(F, r * 0.82));
-          pts.push(p.clone().addScaledVector(X, sx * w * 0.72).addScaledVector(F, r * 1.1));
+          pts.push(p.clone().addScaledVector(X, sx * w * 0.72).addScaledVector(F, r * 1.08));
           pts.push(p.clone().addScaledVector(X, sx * w).addScaledVector(F, r * 0.35));
         }
       }
       // shrink each plate a touch along the neck so the segments read
       const cen = pts.reduce((a, b) => a.add(b), V(0, 0, 0)).divideScalar(pts.length);
       const T = fine[i + 1].p.clone().sub(fine[i].p).normalize();
-      for (const q of pts) { const d = q.clone().sub(cen).dot(T); q.addScaledVector(T, -d * 0.14); }
+      for (const q of pts) { const d = q.clone().sub(cen).dot(T); q.addScaledVector(T, -d * 0.08); }
       C.push(paint(hull(pts), P.belly, 'y', [0.2, 0.85]));
+    }
+  }
+
+  // dorsal ridge scales down the back of the neck
+  {
+    const X = V(1, 0, 0);
+    for (const t of [0.5, 0.62, 0.74]) {
+      const i = Math.round(t * 11), sm = neckS[i];
+      const T = neckS[Math.min(i + 1, 11)].p.clone().sub(neckS[i - 1].p).normalize();
+      const back = new THREE.Vector3().crossVectors(T, X).normalize(); // -z-ish
+      const dir = back.clone().multiplyScalar(1).addScaledVector(T, -0.9);
+      C.push(flat(shard(sm.p.clone().addScaledVector(back, sm.rx * 0.8), dir, 0.05, 0.08, 4, 0.4), P.greenD));
     }
   }
 
@@ -230,13 +269,15 @@ export function buildGeometry() {
 
   // crest scales: layered shards along the crown, fanning back
   const g = (b, d, w, l) => flat(shard(b, d, w * 1.3, l * 0.9, 4, 0.4), P.greenD);
-  for (const [z, y, dz, l] of [[0.06, 0.12, -0.4, 0.09], [-0.02, 0.13, -0.6, 0.11], [-0.1, 0.1, -0.9, 0.12], [-0.15, 0.03, -1.2, 0.11]])
-    C.push(g(V(0, H.y + y, H.z + z), V(0, 1, dz), 0.05, l));
+  for (const [z, y, dz, l, w] of [[0.08, 0.115, -0.7, 0.1, 0.05], [0.0, 0.125, -1.0, 0.13, 0.058],
+    [-0.08, 0.11, -1.4, 0.14, 0.06], [-0.14, 0.05, -2.2, 0.12, 0.055], [-0.15, -0.04, -3, 0.1, 0.05]])
+    C.push(g(V(0, H.y + y, H.z + z), V(0, 1, dz), w, l));
   for (const [x, z, y, d, l] of [
-    [0.08, 0.04, 0.115, V(0.5, 1, -0.5), 0.08],
-    [0.09, -0.06, 0.1, V(0.6, 0.9, -0.8), 0.09],
-    [0.14, -0.04, 0.04, V(1, 0.5, -0.8), 0.09],
-    [0.14, -0.06, -0.04, V(1, -0.1, -0.8), 0.08],
+    [0.075, 0.05, 0.11, V(0.45, 1, -0.9), 0.09],
+    [0.09, -0.05, 0.1, V(0.6, 0.8, -1.3), 0.11],
+    [0.14, -0.03, 0.05, V(1, 0.45, -1.1), 0.1],
+    [0.15, -0.05, -0.03, V(1, -0.05, -1.0), 0.09],
+    [0.1, -0.12, 0.02, V(0.5, 0.2, -1.4), 0.09],
   ]) S.push(g(V(x, H.y + y, H.z + z), d, 0.045, l));
 
   }
@@ -245,3 +286,6 @@ export function buildGeometry() {
   for (const g of [...HC, ...HS]) { g.translate(-piv.x, -piv.y, -piv.z); g.scale(HSC, HSC, HSC); g.translate(piv.x, piv.y, piv.z); }
   return assemble([...C0, ...HC], [...S0, ...HS]);
 }
+
+// Game name: MeshPart name in Roblox and the export file name
+export const NAME = 'SparringSnake';
